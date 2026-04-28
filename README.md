@@ -210,7 +210,7 @@ The RViz config shows: robot model, LiDAR scan, static map, global/local costmap
 
 ---
 
-### Terminal 5 (optional) — Object Detection (YOLO)
+### Terminal 5 — Object Detection (YOLO)
 
 Requires the camera running (Terminal 1 with `use_camera:=true`). The model is auto-downloaded on first run.
 
@@ -355,22 +355,3 @@ ros2 topic pub /cmd_vel geometry_msgs/msg/Twist \
 
 ---
 
-## Files You Can Safely Delete
-
-These are auto-generated boilerplate from `ros2 pkg create` that serve no purpose in this project:
-
-```
-src/my_robot_bringup/test/test_copyright.py
-src/my_robot_hardware/test/test_copyright.py
-src/my_robot_vision/test/test_copyright.py
-```
-
-All three are decorated with `@pytest.mark.skip` — they never execute. They exist only because the package generator creates them, and removing them has no effect on the build or tests.
-
-```
-src/my_robot_bringup/config/realsense.yaml
-```
-
-This config file is not loaded by any launch file. RealSense parameters are set directly inline in `robot.launch.py`. It can be deleted or kept as a reference document — it has no effect on the running system either way.
-
-**Keep everything else.** The flake8 and pep257 test files enforce code style and are run by `colcon test`.
