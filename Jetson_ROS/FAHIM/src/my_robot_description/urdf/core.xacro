@@ -1,0 +1,142 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+    <!-- =====================================================
+         FAHIM — Core robot body
+         Convention:
+           base_footprint : ground level, at center of robot
+           base_link      : wheel axle height (REP-105), at robot center
+           chassis        : body of robot
+           left_wheel     : driven wheel (left)
+           right_wheel    : driven wheel (right)
+           caster_wheel   : passive front caster
+         Units: meters
+         Body:   0.278 x 0.176 x 0.156  (length x width x height)
+         Wheel:  radius 0.0425, width 0.045
+         Wheel separation (center-to-center): 0.235
+         Ground clearance: 0.020
+    ========================================================= -->
+
+    <!-- ================= BASE_FOOTPRINT ================= -->
+    <!-- Ground-level frame, directly below base_link.
+         Required by Nav2/RTAB-Map. -->
+    <link name="base_footprint"/>
+
+    <!-- ================= BASE_LINK ================= -->
+    <!-- base_link placed at wheel axle height above base_footprint. -->
+    <joint name="base_footprint_to_base_link" type="fixed">
+        <parent link="base_footprint"/>
+        <child link="base_link"/>
+        <origin xyz="0 0 0.0425" rpy="0 0 0"/>
+    </joint>
+
+    <link name="base_link"/>
+
+    <!-- ================= CHASSIS ================= -->
+    <!-- Body origin shifted so wheel axle (base_link origin) is at 95mm from rear.
+         Body bottom sits 20mm above ground = 2.5mm below base_link. -->
+    <joint name="chassis_joint" type="fixed">
+        <parent link="base_link"/>
+        <child link="chassis"/>
+        <origin xyz="-0.095 0 -0.0225" rpy="0 0 0"/>
+    </joint>
+
+    <link name="chassis">
+        <visual>
+            <origin xyz="0.139 0 0.078" rpy="0 0 0"/>
+            <geometry>
+                <box size="0.278 0.176 0.156"/>
+            </geometry>
+            <material name="white"/>
+        </visual>
+        <collision>
+            <origin xyz="0.139 0 0.078" rpy="0 0 0"/>
+            <geometry>
+                <box size="0.278 0.176 0.156"/>
+            </geometry>
+        </collision>
+        <xacro:inertial_box mass="3.0" x="0.278" y="0.176" z="0.156">
+            <origin xyz="0.139 0 0.078" rpy="0 0 0"/>
+        </xacro:inertial_box>
+    </link>
+
+    <!-- ================= LEFT WHEEL ================= -->
+    <!-- Wheel separation 0.235 → each wheel 0.1175 from center.
+         Wheel z=0 in base_link frame (axle is at base_link height). -->
+    <joint name="left_wheel_joint" type="continuous">
+        <parent link="base_link"/>
+        <child link="left_wheel"/>
+        <origin xyz="0 0.1175 0" rpy="-${pi/2} 0 0"/>
+        <axis xyz="0 0 1"/>
+    </joint>
+
+    <link name="left_wheel">
+        <visual>
+            <geometry>
+                <cylinder radius="0.0425" length="0.045"/>
+            </geometry>
+            <material name="blue"/>
+        </visual>
+        <collision>
+            <geometry>
+                <cylinder radius="0.0425" length="0.045"/>
+            </geometry>
+        </collision>
+        <xacro:inertial_cylinder mass="0.15" length="0.045" radius="0.0425">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+        </xacro:inertial_cylinder>
+    </link>
+
+    <!-- ================= RIGHT WHEEL ================= -->
+    <joint name="right_wheel_joint" type="continuous">
+        <parent link="base_link"/>
+        <child link="right_wheel"/>
+        <origin xyz="0 -0.1175 0" rpy="${pi/2} 0 0"/>
+        <axis xyz="0 0 -1"/>
+    </joint>
+
+    <link name="right_wheel">
+        <visual>
+            <geometry>
+                <cylinder radius="0.0425" length="0.045"/>
+            </geometry>
+            <material name="blue"/>
+        </visual>
+        <collision>
+            <geometry>
+                <cylinder radius="0.0425" length="0.045"/>
+            </geometry>
+        </collision>
+        <xacro:inertial_cylinder mass="0.15" length="0.045" radius="0.0425">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+        </xacro:inertial_cylinder>
+    </link>
+
+    <!-- ================= CASTER WHEEL ================= -->
+    <!-- Passive caster near the front of the robot.
+         Sphere radius 0.0225 so it just touches ground (z = -0.020 in base_link).
+         Chassis frame origin is at base_link z=-0.0225, so caster z_in_chassis = 0.0025. -->
+    <joint name="caster_wheel_joint" type="fixed">
+        <parent link="chassis"/>
+        <child link="caster_wheel"/>
+        <origin xyz="0.250 0 0.0025" rpy="0 0 0"/>
+    </joint>
+
+    <link name="caster_wheel">
+        <visual>
+            <geometry>
+                <sphere radius="0.0225"/>
+            </geometry>
+            <material name="black"/>
+        </visual>
+        <collision>
+            <geometry>
+                <sphere radius="0.0225"/>
+            </geometry>
+        </collision>
+        <xacro:inertial_sphere mass="0.05" radius="0.0225">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+        </xacro:inertial_sphere>
+    </link>
+
+</robot>

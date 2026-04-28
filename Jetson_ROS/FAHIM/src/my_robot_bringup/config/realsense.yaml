@@ -1,0 +1,45 @@
+### =====================================================
+### FAHIM — RealSense D435i node parameters
+### Loaded via config_file argument in rs_launch.py.
+###
+### Using a YAML file (instead of launch_arguments) guarantees
+### that enable_gyro / enable_accel are seen by the node before
+### stream negotiation — launch_arguments in rs_launch.py are
+### converted to strings and may miss the parameter server
+### window on some realsense2_camera versions.
+### =====================================================
+
+camera:
+  ros__parameters:
+
+    # --- IMU streams ---
+    enable_gyro:  true
+    enable_accel: true
+    # Combine separate gyro (~400 Hz) and accel (~250 Hz) streams
+    # into a single /camera/imu topic at gyro rate.
+    # "linear_interpolation" is more accurate than "copy".
+    unite_imu_method: "linear_interpolation"
+
+    # --- Depth / RGB streams ---
+    enable_depth: true
+    enable_color: true
+    enable_infra1: false
+    enable_infra2: false
+
+    # --- Stream resolution & frame rate ---
+    depth_width:  640
+    depth_height: 480
+    depth_fps:    30
+    color_width:  640
+    color_height: 480
+    color_fps:    30
+    gyro_fps:     400
+    accel_fps:    250
+
+    # --- Filters ---
+    # align_depth and pointcloud are enabled via launch_arguments;
+    # they live under their own sub-nodes in rs_launch.py so they
+    # cannot be set here.
+
+    # --- TF ---
+    # publish_tf is set false via launch_arguments (URDF owns frames).

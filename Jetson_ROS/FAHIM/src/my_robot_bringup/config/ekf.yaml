@@ -1,0 +1,108 @@
+### =====================================================
+### FAHIM — robot_localization EKF config
+### Primary source: rf2o LiDAR odometry (/odom_lidar)
+###
+### Wheel odometry (/odom) is disabled because the arduino_bridge is
+### publishing at ~5 Hz with gaps up to 1.2 s — far below the expected
+### 50 Hz. Those gaps exceed sensor_timeout and stall the EKF.
+###
+### rf2o scan-matching provides x, y, yaw + vx, vyaw at ~8 Hz from
+### consecutive /scan frames. This is sufficient for both SLAM and Nav2.
+### The wheel odometry issue should be investigated separately (likely a
+### serial read blocking in arduino_bridge).
+###
+### NOTE: every number in the covariance arrays MUST be a float.
+### A bare `0` next to `0.05` breaks the YAML parameter loader with
+### "Sequence should be of same type".
+### =====================================================
+
+ekf_filter_node:
+  ros__parameters:
+    frequency: 30.0
+    sensor_timeout: 1.5      # 1.5 s — accommodates rf2o at ~8 Hz
+    two_d_mode: true
+    transform_time_offset: 0.0
+    transform_timeout: 0.0
+    print_diagnostics: true
+    debug: false
+    publish_tf: true
+    publish_acceleration: false
+
+    # REP-105 frames.
+    # base_link_frame MUST be base_footprint so the EKF publishes
+    # odom -> base_footprint, leaving the URDF joint base_footprint -> base_link
+    # intact. Using base_link here would orphan base_footprint.
+    map_frame:       map
+    odom_frame:      odom
+    base_link_frame: base_footprint
+    world_frame:     odom
+
+    # ---------- LiDAR odometry (rf2o scan-matching) — sole source ----------
+    # rf2o matches consecutive /scan frames and publishes an absolute 2-D
+    # odometry on /odom_lidar at ~8 Hz.
+    #
+    # We fuse x, y, yaw (pose) + vx, vyaw (velocity) from rf2o.
+    # Wheel odometry is NOT fused: the arduino_bridge currently publishes
+    # at ~5 Hz with gaps >1 s which repeatedly triggers sensor_timeout
+    # and stalls the EKF. Wheel odom can be re-enabled once that is fixed.
+    #
+    # odom0_differential: false — rf2o publishes absolute odometry.
+    odom0: /odom_lidar
+    odom0_config:  [true,  true,  false,
+                    false, false, true,
+                    true,  false, false,
+                    false, false, true,
+                    false, false, false]
+    odom0_queue_size: 10
+    odom0_nodelay: true
+    odom0_differential: false
+    odom0_relative: false
+
+    # ---------- Process noise (15x15 diagonal-ish) ----------
+    process_noise_covariance: [0.05, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.05, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.06, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.03, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.03, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.06, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.025,0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.025,0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.04, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.01, 0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.01, 0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.02, 0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.01, 0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.01, 0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.015]
+
+    # ---------- Initial estimate covariance ----------
+    # State order: x, y, z, roll, pitch, yaw, vx, vy, vz, vroll, vpitch, vyaw, ax, ay, az
+    #
+    # CRITICAL: do NOT use 1e-9 here. With P_initial[vx]=1e-9 and R[vx]=0.01 the
+    # Kalman gain K = P/(P+R) ≈ 1e-7 ≈ 0 — the filter ignores every measurement
+    # for the first ~0.5 s while process noise slowly grows P. During that window
+    # the state is frozen at zero while the robot is accelerating; once the gain
+    # opens up the velocity state overshoots and, with no position anchor, diverges.
+    #
+    # Values chosen for FAHIM starting from rest at the origin on a flat floor:
+    #   x, y      : 0.01  (±10 cm — we know start position)
+    #   z,r,p     : 1e-4  (flat floor, very confident)
+    #   yaw       : 0.01  (±~6° — we know start heading)
+    #   vx, vyaw  : 0.01  (robot starts at rest; ±0.1 m/s / ±0.1 rad/s)
+    #   vy,vz,… : 1e-4  (differential drive — lateral / 3-D velocities ~0)
+    #   ax,ay,az  : 1e-4  (accelerations unused; keep small but not numerically zero)
+    initial_estimate_covariance: [0.01,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+                                  0.0,   0.01,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+                                  0.0,   0.0,   1e-4,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+                                  0.0,   0.0,   0.0,   1e-4,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+                                  0.0,   0.0,   0.0,   0.0,   1e-4,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+                                  0.0,   0.0,   0.0,   0.0,   0.0,   0.01,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+                                  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.01,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+                                  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   1e-4,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+                                  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   1e-4,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+                                  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   1e-4,  0.0,   0.0,   0.0,   0.0,   0.0,
+                                  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   1e-4,  0.0,   0.0,   0.0,   0.0,
+                                  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.01,  0.0,   0.0,   0.0,
+                                  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   1e-4,  0.0,   0.0,
+                                  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   1e-4,  0.0,
+                                  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   1e-4]

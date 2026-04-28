@@ -1,0 +1,165 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+    <!-- =====================================================
+         FAHIM — Sensor frames
+         All offsets are from base_link origin (meters).
+         CAD -> URDF mapping:
+           ROS_X = (user_X - 95) / 1000
+           ROS_Y = -(user_Y - 88) / 1000
+           ROS_Z = (user_Z - 20) / 1000 + 0.0025
+         Note: base_link is 2.5 mm below body bottom (wheel axle at z=0).
+
+         NOTE on the RealSense D435i:
+         We publish the FULL camera subtree here (depth/color + optical).
+         In robot.launch.py we launch realsense2_camera with
+             publish_tf:=false
+         so the driver streams only image/pointcloud topics — the TF tree
+         is owned entirely by this URDF. Prevents double-prefix frame
+         conflicts (seen in realsense2_camera v4.57 where base_frame_id
+         became 'camera_camera_link').
+    ========================================================= -->
+
+    <!-- ================= IMU (MPU6050) ================= -->
+    <!-- CAD: (127, 88, 73.6) -> base_link: (0.032, 0, 0.054) -->
+    <joint name="imu_joint" type="fixed">
+        <parent link="base_link"/>
+        <child link="imu_link"/>
+        <origin xyz="0.032 0 0.054" rpy="0 0 0"/>
+    </joint>
+
+    <link name="imu_link">
+        <visual>
+            <geometry>
+                <box size="0.021 0.016 0.003"/>
+            </geometry>
+            <material name="red"/>
+        </visual>
+        <collision>
+            <geometry>
+                <box size="0.021 0.016 0.003"/>
+            </geometry>
+        </collision>
+        <xacro:inertial_box mass="0.005" x="0.021" y="0.016" z="0.003">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+        </xacro:inertial_box>
+    </link>
+
+    <!-- ================= LIDAR (RPLidar A2 M12) ================= -->
+    <!-- laser_frame is the ORIGIN OF THE SCAN PLANE, not the mechanical base.
+         For the RPLidar A2 M12 the scan plane sits ~38 mm above the unit's
+         mounting surface. If your CAD origin was on the mounting surface,
+         add +0.038 to the Z below. Verify with a ruler after mounting.
+         The scan 0° beam must point along +X of laser_frame — if your unit
+         is rotated, apply an rpy yaw here (e.g. "0 0 ${pi}" for 180°). -->
+    <joint name="lidar_joint" type="fixed">
+        <parent link="base_link"/>
+        <child link="laser_frame"/>
+        <!-- RPLidar mounted rotated 180° (cable/0° mark toward the rear).
+             Verified: wall 1 m in front shows at -179° in /scan (raw
+             angles in laser_frame), so yaw = pi aligns laser_frame's +X
+             with base_link's -X, making scan points render in front of
+             the robot in base_link / map frames. -->
+        <origin xyz="-0.036 0.006 0.164" rpy="0 0 ${pi}"/>
+    </joint>
+
+    <link name="laser_frame">
+        <visual>
+            <geometry>
+                <cylinder radius="0.038" length="0.040"/>
+            </geometry>
+            <material name="black"/>
+        </visual>
+        <collision>
+            <geometry>
+                <cylinder radius="0.038" length="0.040"/>
+            </geometry>
+        </collision>
+        <xacro:inertial_cylinder mass="0.170" length="0.040" radius="0.038">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+        </xacro:inertial_cylinder>
+    </link>
+
+    <!-- ================= REALSENSE D435i ================= -->
+    <!-- camera_link is the mechanical mount (bolt-pattern centre). -->
+    <joint name="camera_joint" type="fixed">
+        <parent link="base_link"/>
+        <child link="camera_link"/>
+        <origin xyz="0.157 0 0.105" rpy="0 0 0"/>
+    </joint>
+
+    <link name="camera_link">
+        <visual>
+            <geometry>
+                <box size="0.025 0.090 0.025"/>
+            </geometry>
+            <material name="grey"/>
+        </visual>
+        <collision>
+            <geometry>
+                <box size="0.025 0.090 0.025"/>
+            </geometry>
+        </collision>
+        <xacro:inertial_box mass="0.072" x="0.025" y="0.090" z="0.025">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+        </xacro:inertial_box>
+    </link>
+
+    <!-- Depth sensor body frame — coincident with camera_link on the D435i -->
+    <joint name="camera_depth_joint" type="fixed">
+        <parent link="camera_link"/>
+        <child link="camera_depth_frame"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+    <link name="camera_depth_frame"/>
+
+    <!-- Depth optical frame — REP-103 convention (Z forward, X right, Y down) -->
+    <joint name="camera_depth_optical_joint" type="fixed">
+        <parent link="camera_depth_frame"/>
+        <child link="camera_depth_optical_frame"/>
+        <origin xyz="0 0 0" rpy="${-pi/2} 0 ${-pi/2}"/>
+    </joint>
+    <link name="camera_depth_optical_frame"/>
+
+    <!-- Color (RGB) frame — 15mm to the right of depth on D435i. -->
+    <joint name="camera_color_joint" type="fixed">
+        <parent link="camera_link"/>
+        <child link="camera_color_frame"/>
+        <origin xyz="0 -0.015 0" rpy="0 0 0"/>
+    </joint>
+    <link name="camera_color_frame"/>
+
+    <joint name="camera_color_optical_joint" type="fixed">
+        <parent link="camera_color_frame"/>
+        <child link="camera_color_optical_frame"/>
+        <origin xyz="0 0 0" rpy="${-pi/2} 0 ${-pi/2}"/>
+    </joint>
+    <link name="camera_color_optical_frame"/>
+
+    <!-- ================= REALSENSE D435i IMU frames ================= -->
+    <!-- The D435i IMU (gyro) lives ~5.5 mm from camera_link.
+         These two frames MUST be in the TF tree so robot_localization
+         can transform the /camera/imu angular-velocity vector into
+         base_footprint before fusing it.
+
+         Offsets from Intel D435i Product Datasheet (Rev 009):
+           camera_gyro_frame  <- camera_link : xyz="-0.00552  0.00552  0"
+           camera_gyro_optical_frame is the frame_id reported by
+             /camera/imu when unite_imu_method is enabled.
+             It follows REP-103 optical convention:
+               Z = forward (into scene), X = right, Y = down          -->
+    <joint name="camera_gyro_joint" type="fixed">
+        <parent link="camera_link"/>
+        <child link="camera_gyro_frame"/>
+        <origin xyz="-0.00552 0.00552 0.000" rpy="0 0 0"/>
+    </joint>
+    <link name="camera_gyro_frame"/>
+
+    <joint name="camera_gyro_optical_joint" type="fixed">
+        <parent link="camera_gyro_frame"/>
+        <child link="camera_gyro_optical_frame"/>
+        <origin xyz="0 0 0" rpy="${-pi/2} 0 ${-pi/2}"/>
+    </joint>
+    <link name="camera_gyro_optical_frame"/>
+
+</robot>

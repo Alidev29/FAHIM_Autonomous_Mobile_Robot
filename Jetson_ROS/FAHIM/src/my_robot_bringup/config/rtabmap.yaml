@@ -1,0 +1,70 @@
+### =====================================================
+### FAHIM — RTAB-Map parameters
+### Mode: 2D lidar SLAM with RGB-D appearance (loop closure)
+### Inputs : /scan (RPLidar) + /camera/color + /camera/aligned_depth_to_color
+### Odom   : /odometry/filtered (from EKF — wheel + IMU)
+### Outputs: map -> odom TF + /map (nav_msgs/OccupancyGrid) + /rtabmap/* topics
+### =====================================================
+
+rtabmap:
+  ros__parameters:
+    # ---- Frames ----
+    frame_id: base_link
+    odom_frame_id: odom
+    map_frame_id: map
+
+    # ---- Subscriptions ----
+    subscribe_depth: true
+    subscribe_rgb:   true
+    subscribe_rgbd:  false
+    subscribe_scan:  true
+    subscribe_stereo: false
+    subscribe_odom_info: false
+
+    # Wheel+IMU odom and RGB-D/scan never perfectly sync — approx is mandatory.
+    approx_sync: true
+    approx_sync_max_interval: 0.05
+    sync_queue_size: 30                 # renamed from `queue_size` in rtabmap Humble
+    topic_queue_size: 30
+    wait_for_transform: 0.2
+
+    # ---- TF publishing ----
+    publish_tf: true
+
+    # ---- Database ----
+    # Saved to ~/.ros/rtabmap.db by default. Override at runtime with
+    # `database_path:=…` or with -d CLI flag.
+    Mem/IncrementalMemory: "true"        # SLAM mode (false = localization only)
+    Mem/InitWMWithAllNodes: "false"
+
+    # ---- Loop closure detection ----
+    RGBD/NeighborLinkRefining: "true"
+    RGBD/ProximityBySpace: "true"
+    RGBD/AngularUpdate: "0.05"
+    RGBD/LinearUpdate: "0.05"
+    RGBD/OptimizeMaxError: "3.0"
+    Optimizer/Slam2D: "true"             # force 2-D optimization
+    Reg/Force3DoF: "true"                # planar robot
+    Reg/Strategy: "1"                    # 0=Vis, 1=ICP, 2=Vis+ICP
+
+    # ---- 2-D grid from laser ----
+    Grid/FromDepth: "false"              # use the lidar, not depth, for occupancy
+    Grid/RangeMax: "8.0"
+    Grid/CellSize: "0.05"
+    Grid/RayTracing: "true"
+
+    # ---- ICP with lidar ----
+    Icp/VoxelSize: "0.05"
+    Icp/MaxCorrespondenceDistance: "0.1"
+    Icp/PointToPlane: "false"
+    Icp/Iterations: "30"
+    Icp/Epsilon: "0.001"
+    Icp/CorrespondenceRatio: "0.2"
+
+    # ---- Visual features (for RGB-D loop closure) ----
+    Vis/MinInliers: "12"
+    Vis/FeatureType: "6"                 # 6 = GFTT/BRIEF (fast, Jetson-friendly)
+    Kp/MaxFeatures: "400"
+
+    # ---- Diagnostics ----
+    Rtabmap/DetectionRate: "1.0"         # Hz (lower = less CPU, fine for indoor)
